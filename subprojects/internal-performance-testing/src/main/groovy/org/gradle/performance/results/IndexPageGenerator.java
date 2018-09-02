@@ -26,26 +26,29 @@ import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Comparator.comparing;
-import static java.util.Comparator.comparingInt;
-import static java.util.stream.Collectors.toMap;
+import static java.util.Comparator.comparingDouble;
 
 public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
-    private final Map<String, ScenarioBuildResultData> scenarioBuildResultData;
+    private final Set<ScenarioBuildResultData> scenarios;
 
     public IndexPageGenerator(File resultJson) {
-        this.scenarioBuildResultData = readBuildResultData(resultJson);
+        this.scenarios = readBuildResultData(resultJson);
     }
 
-    private Map<String, ScenarioBuildResultData> readBuildResultData(File resultJson) {
+    @VisibleForTesting
+    Set<ScenarioBuildResultData> readBuildResultData(File resultJson) {
         try {
-            List<ScenarioBuildResultData> list = new ObjectMapper().readValue(resultJson, new TypeReference<List<ScenarioBuildResultData>>() { });
-            return list.stream().collect(toMap(ScenarioBuildResultData::getScenarioName, Function.identity()));
+            Comparator<ScenarioBuildResultData> comparator = comparing(ScenarioBuildResultData::isSuccessful)
+                .thenComparing(comparingDouble(ScenarioBuildResultData::getRegressionPercentage).reversed())
+                .thenComparing(ScenarioBuildResultData::getScenarioName);
+
+            List<ScenarioBuildResultData> list = new ObjectMapper().readValue(resultJson, new TypeReference<List<ScenarioBuildResultData>>() {
+            });
+            return list.stream().collect(() -> new TreeSet<>(comparator), TreeSet::add, TreeSet::addAll);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -54,6 +57,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
     @Override
     public void render(final ResultsStore store, Writer writer) throws IOException {
         new MetricsHtml(writer) {
+            // @formatter:off
             {
                 html();
                     head();
@@ -61,112 +65,93 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
                         title().text("Profile report for channel " + ResultsStoreHelper.determineChannel()).end();
                     end();
                     body();
-
-                    div().id("content");
-                        div().id("controls").end();
+                        div().id("content");
                         renderSummary();
-                        sortTestResults(store).forEach(this::renderScenario);
+                        renderTable();
                     end();
-                    footer(this);
+                footer(this);
                 endAll();
             }
 
+            private void renderTable() {
+                table().classAttr("table-striped table");
+                    renderHeaders();
+                    scenarios.forEach(this::renderScenario);
+                end();
+            }
+
+            private void renderHeaders() {
+                tr();
+                    th().text("Scenario").end();
+                    th().colspan("2").text("Control Group").end();
+                    th().colspan("2").text("Experiment Group").end();
+                    th().colspan("2").text("Regression").end();
+                end();
+            }
+
+            private String determineScenarioCss(ScenarioBuildResultData scenario) {
+                if(scenario.isSuccessful()) {
+                    return "success";
+                } else if(scenario.isRegressed()) {
+                    return "warning";
+                } else {
+                    return "danger";
+                }
+            }
+
+            private void renderScenario(ScenarioBuildResultData scenario) {
+                tr().classAttr(determineScenarioCss(scenario));
+                    td();
+                        a().classAttr("label label-" + determineScenarioCss(scenario));
+                            u().text(scenario.getScenarioName()).end();
+                        end();
+                        a().classAttr("label label-warning");
+                            u().text("details...").end();
+                        end();
+                    end();
+
+                    td();
+                        strong().text(scenario.getControlGroupName()).end();
+                    end();
+
+                    td();
+                        span().classAttr(scenario.getRegressionPercentage() > 0 ? "text-success" : "text-danger").text(scenario.getControlGroupMedian());
+                            small().classAttr("text-muted").text(scenario.getControlGroupStandardError()).end();
+                        end();
+                    end();
+
+                    td();
+                        strong().text(scenario.getExperimentGroupName()).end();
+                    end();
+
+                    td();
+                        span().classAttr(scenario.getRegressionPercentage() <= 0 ? "text-success" : "text-danger").text(scenario.getExperimentGroupMedian());
+                            small().classAttr("text-muted").text(scenario.getExperimentGroupStandardError()).end();
+                        end();
+                    end();
+
+                    td();
+                        span().classAttr(scenario.getRegressionPercentage() > 0 ? "text-success": "text-danger").text(scenario.getFormattedRegression());
+                            small().classAttr("text-muted").text("conf: " + scenario.getConfidence()).end();
+                        end();
+                    end();
+                end();
+            }
+            // @formatter:on
+
             private void renderSummary() {
-                long successCount = scenarioBuildResultData.values().stream().filter(ScenarioBuildResultData::isSuccessful).count();
-                long otherCount = scenarioBuildResultData.size() - successCount;
+                long successCount = scenarios.stream().filter(ScenarioBuildResultData::isSuccessful).count();
+                long regressedCount = scenarios.stream().filter(ScenarioBuildResultData::isRegressed).count();
+                long otherCount = scenarios.size() - successCount;
                 h3().text("" + successCount + " successful scenarios");
+                if (regressedCount > 0) {
+                    text(", " + regressedCount + " regressed scenarios");
+                }
                 if (otherCount > 0) {
                     text(", " + otherCount + " failed scenarios");
                 }
                 end();
             }
-
-            private void renderScenario(PerformanceTestScenario scenario) {
-                if (scenario.isArchived()) {
-                    renderArchivedScenario(scenario);
-                } else {
-                    renderActiveScenario(scenario);
-                }
-            }
-
-            private void renderArchivedScenario(PerformanceTestScenario scenario) {
-                String url = "tests/" + urlEncode(scenario.history.getId()) + ".html";
-                div().a().href(url).text("Archived test:" + scenario.history.getDisplayName()).end().end();
-            }
-
-            private String getTestDescription(PerformanceTestScenario scenario) {
-                return scenario.isSuccessful() ? "Test: " : "Failed test: ";
-            }
-
-            private void renderActiveScenario(PerformanceTestScenario scenario) {
-                h3().classAttr("test-execution");
-                    a().href(scenario.getWebUrl()).text(getTestDescription(scenario) + scenario.name).end();
-                end();
-                table().classAttr("history");
-                tr().classAttr("control-groups");
-                    th().colspan("2").end();
-                    th().colspan(String.valueOf(scenario.history.getScenarioCount() * getColumnsForSamples())).text("Average execution time").end();
-                end();
-                tr();
-                    th().text("Date").end();
-                    th().text("Branch").end();
-                    scenario.history.getScenarioLabels().forEach(this::renderHeaderForSamples);
-                    th().colspan("2").text("Regression").end();
-                end();
-                for (ExperimentData experiment: scenario.experiments) {
-                    tr();
-                        renderDateAndBranch(experiment.execution);
-                        renderSamplesForExperiment(experiment);
-                    end();
-                }
-                end();
-                div().classAttr("details");
-                    a().href("tests/" + urlEncode(scenario.history.getId()) + ".html").text("details...").end();
-                end();
-            }
         };
-    }
-
-    @VisibleForTesting
-    TreeSet<PerformanceTestScenario> sortTestResults() {
-        Comparator<PerformanceTestScenario> comparator = comparing(PerformanceTestScenario::isSuccessful)
-            .thenComparing(comparingInt(PerformanceTestScenario::getRegressionPercentage).reversed())
-            .thenComparing(PerformanceTestScenario::getName);
-
-        return store.getTestNames().stream().map(scenarioName -> {
-            PerformanceTestHistory history = store.getTestResults(scenarioName, 5, 14, ResultsStoreHelper.determineChannel());
-            return new PerformanceTestScenario(scenarioName, history, scenarioBuildResultData.get(scenarioName));
-        }).collect(() -> new TreeSet<>(comparator), TreeSet::add, TreeSet::addAll);
-    }
-
-    private List<ExperimentData> extractExperiementsData(PerformanceTestHistory history) {
-        return filterForRequestedCommit(history.getExecutions())
-            .stream()
-            .map(execution -> extractExperimentData(execution, MeasuredOperationList::getTotalTime))
-            .collect(Collectors.toList());
-    }
-
-    private class PerformanceTestScenario {
-        ScenarioBuildResultData resultData;
-
-        PerformanceTestScenario(ScenarioBuildResultData buildResultData) {
-            this.resultData = buildResultData;
-        }
-
-        private boolean isSuccessful() {
-            return resultData.isSuccessful();
-        }
-
-        private String getWebUrl() {
-            return resultData.getWebUrl();
-        }
-
-        private int getRegressionPercentage() {
-            return 0;
-        }
-
-        private String getName() {
-            return resultData.getScenarioName();
-        }
     }
 }

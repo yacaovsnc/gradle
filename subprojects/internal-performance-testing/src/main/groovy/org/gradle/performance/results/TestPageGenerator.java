@@ -21,11 +21,15 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.googlecode.jatl.Html;
 import org.apache.commons.lang.StringUtils;
+import org.gradle.api.Transformer;
+import org.gradle.performance.measure.DataSeries;
+import org.gradle.performance.measure.Duration;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -59,23 +63,23 @@ public class TestPageGenerator extends HtmlPageGenerator<PerformanceTestHistory>
             h3().text("Test details").end();
             table().classAttr("test-details");
             tr();
-                th().text("Scenario").end();
-                th().text("Test project").end();
-                th().text("Tasks").end();
-                th().text("Clean tasks").end();
-                th().text("Gradle args").end();
-                th().text("Gradle JVM args").end();
-                th().text("Daemon").end();
+            th().text("Scenario").end();
+            th().text("Test project").end();
+            th().text("Tasks").end();
+            th().text("Clean tasks").end();
+            th().text("Gradle args").end();
+            th().text("Gradle JVM args").end();
+            th().text("Daemon").end();
             end();
             for (ScenarioDefinition scenario : testHistory.getScenarios()) {
                 tr();
-                    textCell(scenario.getDisplayName());
-                    textCell(scenario.getTestProject());
-                    textCell(scenario.getTasks());
-                    textCell(scenario.getCleanTasks());
-                    textCell(scenario.getArgs());
-                    textCell(scenario.getGradleOpts());
-                    textCell(scenario.getDaemon());
+                textCell(scenario.getDisplayName());
+                textCell(scenario.getTestProject());
+                textCell(scenario.getTasks());
+                textCell(scenario.getCleanTasks());
+                textCell(scenario.getArgs());
+                textCell(scenario.getGradleOpts());
+                textCell(scenario.getDaemon());
                 end();
             }
             end();
@@ -95,7 +99,6 @@ public class TestPageGenerator extends HtmlPageGenerator<PerformanceTestHistory>
             for (String label : testHistory.getScenarioLabels()) {
                 renderHeaderForSamples(label);
             }
-            th().colspan("2").text("Regression").end();
             th().text("Test version").end();
             th().text("Operating System").end();
             th().text("Host").end();
@@ -112,13 +115,19 @@ public class TestPageGenerator extends HtmlPageGenerator<PerformanceTestHistory>
                 PerformanceTestExecution results = testHistory.getExecutions().get(i);
                 tr();
                 id("result" + results.getExecutionId());
-                renderDateAndBranch(results);
+                textCell(format.timestamp(new Date(results.getStartTime())));
+                textCell(results.getVcsBranch());
 
                 td();
                 renderVcsLinks(results, findPreviousExecutionInSameBranch(results, testHistory, i));
                 end();
 
-                renderSamplesForExperiment(results, MeasuredOperationList::getTotalTime);
+                final List<MeasuredOperationList> scenarios = results.getScenarios();
+                renderSamplesForExperiment(scenarios, new Transformer<DataSeries<Duration>, MeasuredOperationList>() {
+                    public DataSeries<Duration> transform(MeasuredOperationList original) {
+                        return original.getTotalTime();
+                    }
+                });
                 textCell(results.getVersionUnderTest());
                 textCell(results.getOperatingSystem());
                 textCell(results.getHost());

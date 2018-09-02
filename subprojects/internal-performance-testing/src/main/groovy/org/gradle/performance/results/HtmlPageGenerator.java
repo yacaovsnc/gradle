@@ -18,13 +18,10 @@ package org.gradle.performance.results;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
-import com.google.common.collect.MinMaxPriorityQueue;
 import com.googlecode.jatl.Html;
 import org.gradle.api.Transformer;
 import org.gradle.performance.measure.Amount;
 import org.gradle.performance.measure.DataSeries;
-import org.gradle.performance.measure.Duration;
 import org.gradle.performance.util.Git;
 import org.gradle.reporting.ReportRenderer;
 import org.gradle.util.GradleVersion;
@@ -35,14 +32,7 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-
-import static org.gradle.performance.measure.DataSeries.*;
-import static org.gradle.performance.results.PrettyCalculator.*;
-import static org.gradle.performance.results.PrettyCalculator.percentageString;
 
 public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
     protected final FormatSupport format = new FormatSupport();
@@ -60,6 +50,11 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
             .rel("stylesheet")
             .type("text/css")
             .href(rootDir + "css/style.css")
+            .end();
+        html.link()
+            .rel("stylesheet")
+            .type("text/css")
+            .href("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css")
             .end();
         html.script()
             .src(rootDir + "js/jquery.min-1.11.0.js")
@@ -103,7 +98,7 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
         }
     }
 
-    protected class MetricsHtml extends Html {
+    protected static class MetricsHtml extends Html {
         public MetricsHtml(Writer writer) {
             super(writer);
         }
@@ -155,32 +150,46 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
             return 2;
         }
 
-        protected void renderDateAndBranch(PerformanceTestExecution execution) {
-            textCell(format.timestamp(new Date(execution.getStartTime())));
-            textCell(execution.getVcsBranch());
-        }
-
         protected void renderHeaderForSamples(String label) {
             th().colspan(String.valueOf(getColumnsForSamples())).text(label).end();
         }
 
-        protected void renderSamplesForExperiment(PerformanceTestExecution execution, Transformer<DataSeries<Duration>, MeasuredOperationList> transformer) {
-            renderSamplesForExperiment(extractExperimentData(execution, transformer));
-        }
+        protected <T> void renderSamplesForExperiment(Iterable<MeasuredOperationList> experiments, Transformer<DataSeries<T>, MeasuredOperationList> transformer) {
+            List<DataSeries<T>> values = new ArrayList<DataSeries<T>>();
+            Amount<T> min = null;
+            Amount<T> max = null;
+            for (MeasuredOperationList testExecution : experiments) {
+                DataSeries<T> data = transformer.transform(testExecution);
+                if (data.isEmpty()) {
+                    values.add(null);
+                } else {
+                    Amount<T> value = data.getMedian();
+                    values.add(data);
+                    if (min == null || value.compareTo(min) < 0) {
+                        min = value;
+                    }
+                    if (max == null || value.compareTo(max) > 0) {
+                        max = value;
+                    }
+                }
+            }
+            if (min != null && min.equals(max)) {
+                min = null;
+                max = null;
+            }
 
-        protected void renderSamplesForExperiment(ExperimentData experiments) {
-            for (DataSeries<Duration> data : experiments.experimentData) {
+            for (DataSeries<T> data : values) {
                 if (data == null) {
                     td().text("").end();
                     td().text("").end();
                 } else {
-                    Amount<Duration> value = data.getMedian();
-                    Amount<Duration> se = data.getStandardError();
+                    Amount<T> value = data.getMedian();
+                    Amount<T> se = data.getStandardError();
                     String classAttr = "numeric";
-                    if (value.equals(experiments.experimentWithMinMedian)) {
+                    if (value.equals(min)) {
                         classAttr += " min-value";
                     }
-                    if (value.equals(experiments.experimentWithMaxMedian)) {
+                    if (value.equals(max)) {
                         classAttr += " max-value";
                     }
                     td()
@@ -194,65 +203,7 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
                         .end();
                 }
             }
-
-            if (experiments.regressionPercentage != null) {
-                td()
-                    .classAttr("numeric")
-                    .text(percentageString(experiments.regressionPercentage))
-                    .end();
-                td()
-                    .classAttr("numeric more-detail")
-                    .text("conf: " + percentageString(experiments.confidencePercentage))
-                    .end();
-            } else {
-                td().text("").end();
-                td().text("").end();
-            }
         }
-    }
-
-    protected static class ExperimentData {
-        protected PerformanceTestExecution execution;
-        protected List<DataSeries<Duration>> experimentData;
-        protected Amount<Duration> experimentWithMaxMedian;
-        protected Amount<Duration> experimentWithMinMedian;
-        protected Integer regressionPercentage;
-        protected Integer confidencePercentage;
-
-        protected ExperimentData(PerformanceTestExecution execution, List<DataSeries<Duration>> experimentData, Amount<Duration> experimentWithMinMedian, Amount<Duration> experimentWithMaxMedian) {
-            this.execution = execution;
-            this.experimentData = experimentData;
-            this.experimentWithMaxMedian = experimentWithMaxMedian;
-            this.experimentWithMinMedian = experimentWithMinMedian;
-            determineRegression();
-        }
-
-        private void determineRegression() {
-            if(experimentData.isEmpty()) {
-                return;
-            }
-            Optional<DataSeries<Duration>> experimentalGroup = Lists.reverse(experimentData).stream().filter(Objects::nonNull).findFirst();
-            Optional<DataSeries<Duration>> controlGroup = experimentData.stream().filter(Objects::nonNull).findFirst();
-            if(experimentalGroup.isPresent() && controlGroup.isPresent()) {
-                regressionPercentage = percentChange(experimentalGroup.get().getAverage(), controlGroup.get().getAverage()).intValue();
-                confidencePercentage = percentage(confidenceInDifference(experimentalGroup.get(), controlGroup.get()));
-            }
-        }
-    }
-
-    protected ExperimentData extractExperimentData(PerformanceTestExecution execution, Transformer<DataSeries<Duration>, MeasuredOperationList> transformer) {
-        MinMaxPriorityQueue<Amount> minMaxCalculator = MinMaxPriorityQueue.create();
-        List<DataSeries<Duration>> experimentData = new ArrayList<>();
-
-        execution.getScenarios().stream().map(transformer::transform).forEach(data -> {
-            if (data.isEmpty()) {
-                experimentData.add(null);
-            } else {
-                experimentData.add(data);
-                minMaxCalculator.add(data.getMedian());
-            }
-        });
-        return new ExperimentData(execution, experimentData, minMaxCalculator.peekFirst(), minMaxCalculator.peekLast());
     }
 
     protected List<? extends PerformanceTestExecution> filterForRequestedCommit(List<? extends PerformanceTestExecution> results) {

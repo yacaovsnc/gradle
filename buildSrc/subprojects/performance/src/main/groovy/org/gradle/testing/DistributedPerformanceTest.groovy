@@ -41,6 +41,8 @@ import org.gradle.process.JavaExecSpec
 import groovy.transform.CompileStatic
 import org.openmbee.junit.JUnitMarshalling
 import org.openmbee.junit.model.JUnitTestSuite
+import org.apache.commons.io.input.CloseShieldInputStream
+import groovy.json.JsonOutput
 
 /**
  * Runs each performance test scenario in a dedicated TeamCity job.
@@ -89,7 +91,7 @@ class DistributedPerformanceTest extends PerformanceTest {
 
     private Map<String, Object> finishedBuilds = [:]
 
-    private Map<String, List<JUnitTestSuite>> testResultFilesForBuild = [:]
+    private Map<String, JUnitTestSuite> testResultForBuild = [:]
     private File workerTestResultsTempDir
 
     private final JUnitXmlTestEventsGenerator testEventsGenerator
@@ -134,20 +136,20 @@ class DistributedPerformanceTest extends PerformanceTest {
         }
     }
 
-    @TypeChecked(TypeCheckingMode.SKIP)
     private File generateResultJson() {
         File resultJson = new File(workerTestResultsTempDir, 'results.json')
-        List resultData = finishedBuilds.collect { workerBuildId, xmlroot ->
+        List<Map> resultData = finishedBuilds.collect { workerBuildId, xmlroot ->
             // org.gradle.performance.results.ScenarioBuildResultData
             [
-                buildId: workerBuildId,
                 scenarioName: findScenarioNameInXml(xmlroot),
-                webUrl: it.@webUrl.toString(),
-                successful: it.@status.toString() == 'SUCCESS',
-                resultFiles: testResultFilesForBuild.get(workerBuildId)
-            ]
+                webUrl: findWebUrlInXml(xmlroot),
+                successful: findStatusInXml(xmlroot),
+                result: testResultForBuild.get(workerBuildId)?.systemOut
+            ] as Map
         }
         resultJson.text = JsonOutput.toJson(resultData)
+        logger.info("JSON: ${resultJson.text}")
+
         return resultJson
     }
 
@@ -203,6 +205,7 @@ class DistributedPerformanceTest extends PerformanceTest {
     }
 
     private void fillScenarioList() {
+//        scenarioList.text = 'help on k9AndroidBuild;0;k9AndroidBuild'
         super.executeTests()
     }
 
@@ -215,8 +218,8 @@ class DistributedPerformanceTest extends PerformanceTest {
                         <property name="scenario" value="${scenario.id}"/>
                         <property name="templates" value="${scenario.templates.join(' ')}"/>
                         <property name="baselines" value="${baselines ?: 'defaults'}"/>
-                        <property name="warmups" value="${warmups != null ?: 'defaults'}"/>
-                        <property name="runs" value="${runs != null ?: 'defaults'}"/>
+                        <property name="warmups" value="${warmups ?: 'defaults'}"/>
+                        <property name="runs" value="${runs ?: 'defaults'}"/>
                         <property name="checks" value="${checks ?: 'all'}"/>
                         <property name="channel" value="${channel ?: 'commits'}"/>
                     </properties>
@@ -282,8 +285,19 @@ class DistributedPerformanceTest extends PerformanceTest {
 
     @TypeChecked(TypeCheckingMode.SKIP)
     private String findScenarioNameInXml(xmlroot) {
-        xmlroot.properties.children().properties.find { it.@name == 'scenario' }.@value.text()
+        xmlroot.properties.children().find { it.@name == 'scenario' }.@value.text()
     }
+
+    @TypeChecked(TypeCheckingMode.SKIP)
+    private boolean findStatusInXml(xmlroot) {
+        xmlroot.@status.toString() == 'SUCCESS'
+    }
+
+    @TypeChecked(TypeCheckingMode.SKIP)
+    private String findWebUrlInXml(xmlroot) {
+        xmlroot.@webUrl.toString()
+    }
+
 
     @TypeChecked(TypeCheckingMode.SKIP)
     private void join(String jobId) {
@@ -300,9 +314,9 @@ class DistributedPerformanceTest extends PerformanceTest {
         finishedBuilds.put(jobId, response.data)
 
         try {
-            List<JUnitTestSuite> results = fetchTestResults(response.data)
-            testResultFilesForBuild.put(jobId, results)
-            fireTestListener(results, response.data)
+            JUnitTestSuite result = fetchTestResult(response.data)
+            testResultForBuild.put(jobId, result)
+            fireTestListener(result, response.data)
         } catch (e) {
             e.printStackTrace(System.err)
         }
@@ -337,16 +351,13 @@ class DistributedPerformanceTest extends PerformanceTest {
         )
     }
 
-    private void fireTestListener(List<File> results, Object build) {
-        results.each {
-            JUnitTestSuite testSuite = JUnitMarshalling.unmarshalTestSuite(new FileInputStream(it))
-            testEventsGenerator.processTestSuite(testSuite, build)
-        }
+    private void fireTestListener(JUnitTestSuite result, Object build) {
+        testEventsGenerator.processTestSuite(result, build)
     }
 
     @TypeChecked(TypeCheckingMode.SKIP)
-    private List<JUnitTestSuite> fetchTestResults(buildData) {
-        def junitTestSuites = []
+    private JUnitTestSuite fetchTestResult(buildData) {
+        JUnitTestSuite testSuite = null
         def artifactsUri = buildData?.artifacts?.@href?.text()
         if (artifactsUri) {
             def resultArtifacts = client.get(path: "${artifactsUri}/results/${project.name}/build/")
@@ -359,35 +370,31 @@ class DistributedPerformanceTest extends PerformanceTest {
                     def contentUri = fileNode.content.@href.text()
                     client.get(path: contentUri, contentType: ContentType.BINARY) {
                         resp, inputStream ->
-                            junitTestSuites = parseXmlsInZip(inputStream)
+                            testSuite = parseXmlsInZip(inputStream)
                     }
                 }
             }
         }
-        junitTestSuites
+        return testSuite
     }
 
-    List<JUnitTestSuite> parseXmlsInZip(InputStream inputStream) {
+    JUnitTestSuite parseXmlsInZip(InputStream inputStream) {
         List<JUnitTestSuite> parsedXmls = []
         new ZipInputStream(inputStream).withStream { zipInput ->
             def entry
             while (entry = zipInput.nextEntry) {
-                if (!entry.isDirectory() && entry.name.endsWith(".xml")) {
-                    def file = new File(destination, entry.name)
-                    file.parentFile?.mkdirs()
-                    new FileOutputStream(file).withStream {
-                        it << zipInput
-                    }
-                    unzippedFiles << file
+                if (!entry.isDirectory() && entry.name.endsWith('.xml')) {
+                    parsedXmls.add(JUnitMarshalling.unmarshalTestSuite(new CloseShieldInputStream(zipInput)))
                 }
             }
         }
-        parsedXmls
+        assert parsedXmls.size() == 1
+        parsedXmls[0]
     }
 
     @TypeChecked(TypeCheckingMode.SKIP)
     private void checkForErrors() {
-        def failedBuilds = finishedBuilds.findAll { it.@status != "SUCCESS" }
+        def failedBuilds = finishedBuilds.values().findAll { it.@status != "SUCCESS" }
         if (failedBuilds) {
             throw new GradleException("${failedBuilds.size()} performance tests failed. See $scenarioReport for details.")
         }
