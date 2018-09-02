@@ -44,12 +44,12 @@ public class ReportGenerator {
 
             fileRenderer.render(store, new IndexPageGenerator(resultJson), new File(outputDirectory, "index.html"));
 
-//            File testsDir = new File(outputDirectory, "tests");
-//            for (String testName : store.getTestNames()) {
-//                PerformanceTestHistory testResults = store.getTestResults(testName, 500, 90, ResultsStoreHelper.determineChannel());
-//                fileRenderer.render(testResults, testHtmlRenderer, new File(testsDir, testResults.getId() + ".html"));
-//                fileRenderer.render(testResults, testDataRenderer, new File(testsDir, testResults.getId() + ".json"));
-//            }
+            File testsDir = new File(outputDirectory, "tests");
+            for (String testName : store.getTestNames()) {
+                PerformanceTestHistory testResults = store.getTestResults(testName, 500, 90, ResultsStoreHelper.determineChannel());
+                fileRenderer.render(testResults, testHtmlRenderer, new File(testsDir, testResults.getId() + ".html"));
+                fileRenderer.render(testResults, testDataRenderer, new File(testsDir, testResults.getId() + ".json"));
+            }
 
             copyResource("jquery.min-1.11.0.js", outputDirectory);
             copyResource("flot-0.8.1-min.js", outputDirectory);

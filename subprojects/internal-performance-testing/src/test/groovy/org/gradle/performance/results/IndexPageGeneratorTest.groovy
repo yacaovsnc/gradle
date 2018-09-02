@@ -23,9 +23,11 @@ import org.gradle.performance.measure.MeasuredOperation
 import org.gradle.performance.util.Git
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Subject
 
+@Ignore
 class IndexPageGeneratorTest extends Specification {
     @Rule
     TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
