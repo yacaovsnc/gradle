@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package org.gradle.testing
+package org.gradle.performance.results
 
-import groovy.transform.Immutable
-
-@Immutable
-class CoordinatorBuild {
-    String id
-    String lastChangeId
-    String buildTypeId
+class ScenarioBuildResultData {
+    String buildId
+    String scenarioName
+    String webUrl
+    boolean successful
+    List<String> resultFiles
 }

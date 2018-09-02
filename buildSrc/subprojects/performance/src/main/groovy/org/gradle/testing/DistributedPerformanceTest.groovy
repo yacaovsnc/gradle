@@ -39,9 +39,8 @@ import java.util.zip.ZipInputStream
 import org.gradle.api.Action
 import org.gradle.process.JavaExecSpec
 import groovy.transform.CompileStatic
-import org.openmbee.junit.model.JUnitTestSuite
 import org.openmbee.junit.JUnitMarshalling
-import org.apache.commons.io.input.CloseShieldInputStream
+import org.openmbee.junit.model.JUnitTestSuite
 
 /**
  * Runs each performance test scenario in a dedicated TeamCity job.
@@ -80,19 +79,15 @@ class DistributedPerformanceTest extends PerformanceTest {
     @PathSensitive(PathSensitivity.RELATIVE)
     File scenarioList
 
-    @OutputFile
-    @PathSensitive(PathSensitivity.RELATIVE)
-    File scenarioReport
-
     @OutputDirectory
     @PathSensitive(PathSensitivity.RELATIVE)
     File reportDir
 
     private RESTClient client
 
-    private List<String> scheduledBuilds = Lists.newArrayList()
+    private List<String> scheduledBuildIds = Lists.newArrayList()
 
-    private List<Object> finishedBuilds = Lists.newArrayList()
+    private Map<String, Object> finishedBuilds = [:]
 
     private Map<String, List<JUnitTestSuite>> testResultFilesForBuild = [:]
     private File workerTestResultsTempDir
@@ -139,12 +134,29 @@ class DistributedPerformanceTest extends PerformanceTest {
         }
     }
 
+    @TypeChecked(TypeCheckingMode.SKIP)
+    private File generateResultJson() {
+        File resultJson = new File(workerTestResultsTempDir, 'results.json')
+        List resultData = finishedBuilds.collect { workerBuildId, xmlroot ->
+            // org.gradle.performance.results.ScenarioBuildResultData
+            [
+                buildId: workerBuildId,
+                scenarioName: findScenarioNameInXml(xmlroot),
+                webUrl: it.@webUrl.toString(),
+                successful: it.@status.toString() == 'SUCCESS',
+                resultFiles: testResultFilesForBuild.get(workerBuildId)
+            ]
+        }
+        resultJson.text = JsonOutput.toJson(resultData)
+        return resultJson
+    }
+
     private void generatePerformanceReport() {
         project.delete(reportDir)
         project.javaexec(new Action<JavaExecSpec>() {
             void execute(JavaExecSpec spec) {
                 spec.setMain("org.gradle.performance.results.ReportGenerator")
-                spec.args(resultStoreClass, reportDir.getPath())
+                spec.args(resultStoreClass, reportDir.path, generateResultJson().path)
                 spec.systemProperties(databaseParameters)
                 spec.systemProperty("org.gradle.performance.execution.channel", channel)
                 spec.setClasspath(DistributedPerformanceTest.this.getClasspath())
@@ -169,10 +181,10 @@ class DistributedPerformanceTest extends PerformanceTest {
 
         def scenarios = scenarioList.readLines()
             .collect { line ->
-                def parts = Splitter.on(';').split(line).toList()
-                new Scenario(id: parts[0], estimatedRuntime: Long.parseLong(parts[1]), templates: parts.subList(2, parts.size()))
-            }
-            .sort { -it.estimatedRuntime }
+            def parts = Splitter.on(';').split(line).toList()
+            new Scenario(id: parts[0], estimatedRuntime: Long.parseLong(parts[1]), templates: parts.subList(2, parts.size()))
+        }
+        .sort { -it.estimatedRuntime }
 
         createClient()
 
@@ -183,11 +195,9 @@ class DistributedPerformanceTest extends PerformanceTest {
             schedule(it, coordinatorBuild?.lastChangeId)
         }
 
-        scheduledBuilds.each {
+        scheduledBuildIds.each {
             join(it)
         }
-
-        writeScenarioReport()
 
         checkForErrors()
     }
@@ -204,11 +214,11 @@ class DistributedPerformanceTest extends PerformanceTest {
                     <properties>
                         <property name="scenario" value="${scenario.id}"/>
                         <property name="templates" value="${scenario.templates.join(' ')}"/>
-                        <property name="baselines" value="${baselines?:'defaults'}"/>
-                        <property name="warmups" value="${warmups!=null?:'defaults'}"/>
-                        <property name="runs" value="${runs!=null?:'defaults'}"/>
-                        <property name="checks" value="${checks?:'all'}"/>
-                        <property name="channel" value="${channel?:'commits'}"/>
+                        <property name="baselines" value="${baselines ?: 'defaults'}"/>
+                        <property name="warmups" value="${warmups != null ?: 'defaults'}"/>
+                        <property name="runs" value="${runs != null ?: 'defaults'}"/>
+                        <property name="checks" value="${checks ?: 'all'}"/>
+                        <property name="channel" value="${channel ?: 'commits'}"/>
                     </properties>
                     ${renderLastChange(lastChangeId)}
                 </build>
@@ -227,7 +237,7 @@ class DistributedPerformanceTest extends PerformanceTest {
         if (lastChangeId && scheduledChangeId != lastChangeId) {
             throw new RuntimeException("The requested change id is different than the actual one. requested change id: $lastChangeId in coordinatorBuildId: $coordinatorBuildId , actual change id: $scheduledChangeId in workerBuildId: $workerBuildId\nresponse: ${xmlToString(response.data)}")
         }
-        scheduledBuilds += workerBuildId
+        scheduledBuildIds += workerBuildId
     }
 
     @TypeChecked(TypeCheckingMode.SKIP)
@@ -271,6 +281,11 @@ class DistributedPerformanceTest extends PerformanceTest {
     }
 
     @TypeChecked(TypeCheckingMode.SKIP)
+    private String findScenarioNameInXml(xmlroot) {
+        xmlroot.properties.children().properties.find { it.@name == 'scenario' }.@value.text()
+    }
+
+    @TypeChecked(TypeCheckingMode.SKIP)
     private void join(String jobId) {
         def finished = false
         def response
@@ -282,7 +297,7 @@ class DistributedPerformanceTest extends PerformanceTest {
                 sleep(TimeUnit.MINUTES.toMillis(1))
             }
         }
-        finishedBuilds += response.data
+        finishedBuilds.put(jobId, response.data)
 
         try {
             List<JUnitTestSuite> results = fetchTestResults(response.data)
@@ -322,9 +337,10 @@ class DistributedPerformanceTest extends PerformanceTest {
         )
     }
 
-    private void fireTestListener(List<JUnitTestSuite> results, Object build) {
+    private void fireTestListener(List<File> results, Object build) {
         results.each {
-            testEventsGenerator.processTestSuite(it, build)
+            JUnitTestSuite testSuite = JUnitMarshalling.unmarshalTestSuite(new FileInputStream(it))
+            testEventsGenerator.processTestSuite(testSuite, build)
         }
     }
 
@@ -356,25 +372,22 @@ class DistributedPerformanceTest extends PerformanceTest {
         new ZipInputStream(inputStream).withStream { zipInput ->
             def entry
             while (entry = zipInput.nextEntry) {
-                if (!entry.isDirectory() && entry.name.endsWith('.xml')) {
-                    parsedXmls.add(JUnitMarshalling.unmarshalTestSuite(new CloseShieldInputStream(zipInput)))
+                if (!entry.isDirectory() && entry.name.endsWith(".xml")) {
+                    def file = new File(destination, entry.name)
+                    file.parentFile?.mkdirs()
+                    new FileOutputStream(file).withStream {
+                        it << zipInput
+                    }
+                    unzippedFiles << file
                 }
             }
         }
         parsedXmls
     }
 
-    private void writeScenarioReport() {
-        def renderer = new ScenarioReportRenderer()
-        IoActions.writeTextFile(scenarioReport) { Writer writer ->
-            renderer.render(writer, project.name, finishedBuilds, testResultFilesForBuild)
-        }
-        renderer.writeCss(scenarioReport.getParentFile())
-    }
-
     @TypeChecked(TypeCheckingMode.SKIP)
     private void checkForErrors() {
-        def failedBuilds = finishedBuilds.findAll { it.@status != "SUCCESS"}
+        def failedBuilds = finishedBuilds.findAll { it.@status != "SUCCESS" }
         if (failedBuilds) {
             throw new GradleException("${failedBuilds.size()} performance tests failed. See $scenarioReport for details.")
         }
@@ -386,7 +399,6 @@ class DistributedPerformanceTest extends PerformanceTest {
         client.headers['Origin'] = teamCityUrl
         client
     }
-
 
     private static class Scenario {
         String id

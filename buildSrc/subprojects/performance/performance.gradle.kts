@@ -1,5 +1,9 @@
 apply(plugin = "org.gradle.kotlin.kotlin-dsl")
 
+repositories {
+    jcenter()
+}
+
 dependencies {
     api(project(":integrationTesting"))
     implementation(project(":build"))

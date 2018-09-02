@@ -16,96 +16,157 @@
 
 package org.gradle.performance.results;
 
-import org.gradle.api.Transformer;
-import org.gradle.performance.measure.DataSeries;
-import org.gradle.performance.measure.Duration;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.util.Date;
-import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static java.util.Comparator.comparing;
+import static java.util.Comparator.comparingInt;
+import static java.util.stream.Collectors.toMap;
 
 public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
-    private final List<NavigationItem> navigationItems;
+    private final Map<String, ScenarioBuildResultData> scenarioBuildResultData;
 
-    public IndexPageGenerator(List<NavigationItem> navigationItems) {
-        this.navigationItems = navigationItems;
+    public IndexPageGenerator(File resultJson) {
+        this.scenarioBuildResultData = readBuildResultData(resultJson);
+    }
+
+    private Map<String, ScenarioBuildResultData> readBuildResultData(File resultJson) {
+        try {
+            List<ScenarioBuildResultData> list = new ObjectMapper().readValue(resultJson, new TypeReference<List<ScenarioBuildResultData>>() { });
+            return list.stream().collect(toMap(ScenarioBuildResultData::getScenarioName, Function.identity()));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
     public void render(final ResultsStore store, Writer writer) throws IOException {
-        new MetricsHtml(writer) {{
-            html();
-                head();
-                    headSection(this);
-                    title().text("Profile report for channel " + ResultsStoreHelper.determineChannel()).end();
+        new MetricsHtml(writer) {
+            {
+                html();
+                    head();
+                        headSection(this);
+                        title().text("Profile report for channel " + ResultsStoreHelper.determineChannel()).end();
+                    end();
+                    body();
+
+                    div().id("content");
+                        div().id("controls").end();
+                        renderSummary();
+                        sortTestResults(store).forEach(this::renderScenario);
+                    end();
+                    footer(this);
+                endAll();
+            }
+
+            private void renderSummary() {
+                long successCount = scenarioBuildResultData.values().stream().filter(ScenarioBuildResultData::isSuccessful).count();
+                long otherCount = scenarioBuildResultData.size() - successCount;
+                h3().text("" + successCount + " successful scenarios");
+                if (otherCount > 0) {
+                    text(", " + otherCount + " failed scenarios");
+                }
                 end();
-                body();
+            }
 
-                navigation(navigationItems);
+            private void renderScenario(PerformanceTestScenario scenario) {
+                if (scenario.isArchived()) {
+                    renderArchivedScenario(scenario);
+                } else {
+                    renderActiveScenario(scenario);
+                }
+            }
 
-                div().id("content");
+            private void renderArchivedScenario(PerformanceTestScenario scenario) {
+                String url = "tests/" + urlEncode(scenario.history.getId()) + ".html";
+                div().a().href(url).text("Archived test:" + scenario.history.getDisplayName()).end().end();
+            }
 
-                    Map<String, String> archived = new LinkedHashMap<String, String>();
-                    List<String> testNames = store.getTestNames();
-                    div().id("controls").end();
-                    for (String testName : testNames) {
-                        PerformanceTestHistory testHistory = store.getTestResults(testName, 5, 14, ResultsStoreHelper.determineChannel());
-                        List<? extends PerformanceTestExecution> results = testHistory.getExecutions();
-                        results = filterForRequestedCommit(results);
-                        if (results.isEmpty()) {
-                            archived.put(urlEncode(testHistory.getId()), testHistory.getDisplayName());
-                            continue;
-                        }
-                        h2().classAttr("test-execution");
-                            text("Test: " + testName);
-                        end();
-                        table().classAttr("history");
-                        tr().classAttr("control-groups");
-                            th().colspan("2").end();
-                            th().colspan(String.valueOf(testHistory.getScenarioCount() * getColumnsForSamples())).text("Average execution time").end();
-                        end();
-                        tr();
-                            th().text("Date").end();
-                            th().text("Branch").end();
-                            for (String label : testHistory.getScenarioLabels()) {
-                                renderHeaderForSamples(label);
-                            }
-                        end();
-                        for (PerformanceTestExecution performanceTestExecution : results) {
-                            tr();
-                                td().text(format.timestamp(new Date(performanceTestExecution.getStartTime()))).end();
-                                td().text(performanceTestExecution.getVcsBranch()).end();
-                                renderSamplesForExperiment(performanceTestExecution.getScenarios(), new Transformer<DataSeries<Duration>, MeasuredOperationList>() {
-                                    @Override
-                                    public DataSeries<Duration> transform(MeasuredOperationList measuredOperations) {
-                                        return measuredOperations.getTotalTime();
-                                    }
-                                });
-                            end();
-                        }
-                        end();
-                        div().classAttr("details");
-                            String url = "tests/" + urlEncode(testHistory.getId()) + ".html";
-                            a().href(url).text("details...").end();
-                        end();
-                    }
-                    if (!archived.isEmpty()) {
-                        h2().text("Archived tests").end();
-                        div();
-                            ul();
-                                for (Map.Entry<String, String> entry : archived.entrySet()) {
-                                    String url = "tests/" + entry.getKey() + ".html";
-                                    li().a().href(url).text(entry.getValue()).end().end();
-                                }
-                            end();
-                        end();
-                    }
+            private String getTestDescription(PerformanceTestScenario scenario) {
+                return scenario.isSuccessful() ? "Test: " : "Failed test: ";
+            }
+
+            private void renderActiveScenario(PerformanceTestScenario scenario) {
+                h3().classAttr("test-execution");
+                    a().href(scenario.getWebUrl()).text(getTestDescription(scenario) + scenario.name).end();
                 end();
-                footer(this);
-            endAll();
-        }};
+                table().classAttr("history");
+                tr().classAttr("control-groups");
+                    th().colspan("2").end();
+                    th().colspan(String.valueOf(scenario.history.getScenarioCount() * getColumnsForSamples())).text("Average execution time").end();
+                end();
+                tr();
+                    th().text("Date").end();
+                    th().text("Branch").end();
+                    scenario.history.getScenarioLabels().forEach(this::renderHeaderForSamples);
+                    th().colspan("2").text("Regression").end();
+                end();
+                for (ExperimentData experiment: scenario.experiments) {
+                    tr();
+                        renderDateAndBranch(experiment.execution);
+                        renderSamplesForExperiment(experiment);
+                    end();
+                }
+                end();
+                div().classAttr("details");
+                    a().href("tests/" + urlEncode(scenario.history.getId()) + ".html").text("details...").end();
+                end();
+            }
+        };
+    }
+
+    @VisibleForTesting
+    TreeSet<PerformanceTestScenario> sortTestResults() {
+        Comparator<PerformanceTestScenario> comparator = comparing(PerformanceTestScenario::isSuccessful)
+            .thenComparing(comparingInt(PerformanceTestScenario::getRegressionPercentage).reversed())
+            .thenComparing(PerformanceTestScenario::getName);
+
+        return store.getTestNames().stream().map(scenarioName -> {
+            PerformanceTestHistory history = store.getTestResults(scenarioName, 5, 14, ResultsStoreHelper.determineChannel());
+            return new PerformanceTestScenario(scenarioName, history, scenarioBuildResultData.get(scenarioName));
+        }).collect(() -> new TreeSet<>(comparator), TreeSet::add, TreeSet::addAll);
+    }
+
+    private List<ExperimentData> extractExperiementsData(PerformanceTestHistory history) {
+        return filterForRequestedCommit(history.getExecutions())
+            .stream()
+            .map(execution -> extractExperimentData(execution, MeasuredOperationList::getTotalTime))
+            .collect(Collectors.toList());
+    }
+
+    private class PerformanceTestScenario {
+        ScenarioBuildResultData resultData;
+
+        PerformanceTestScenario(ScenarioBuildResultData buildResultData) {
+            this.resultData = buildResultData;
+        }
+
+        private boolean isSuccessful() {
+            return resultData.isSuccessful();
+        }
+
+        private String getWebUrl() {
+            return resultData.getWebUrl();
+        }
+
+        private int getRegressionPercentage() {
+            return 0;
+        }
+
+        private String getName() {
+            return resultData.getScenarioName();
+        }
     }
 }

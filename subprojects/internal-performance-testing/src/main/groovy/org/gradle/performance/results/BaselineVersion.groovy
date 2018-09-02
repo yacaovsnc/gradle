@@ -17,12 +17,12 @@
 package org.gradle.performance.results
 
 import groovy.transform.CompileStatic
-import org.apache.commons.math3.stat.inference.MannWhitneyUTest
-import org.gradle.performance.measure.Amount
 import org.gradle.performance.measure.DataSeries
 import org.gradle.performance.measure.Duration
 
 import static PrettyCalculator.toMillis
+import static org.gradle.performance.measure.DataSeries.confidenceInDifference
+import static org.gradle.performance.results.PrettyCalculator.percentage
 
 /**
  * Allows comparing one Gradle version's results against another, using the Mann–Whitney U test with a minimum confidence of 99%.
@@ -56,7 +56,7 @@ class BaselineVersion implements VersionResults {
             } else {
                 sb.append "Speed $displayName: Results were inconclusive"
             }
-            String confidencePercent = confidenceInDifference(results.totalTime, current.totalTime) * 100 as int
+            String confidencePercent = percentage(confidenceInDifference(results.totalTime, current.totalTime))
             sb.append(" with " + confidencePercent + "% confidence.\n")
 
             def diff = currentVersionMean - thisVersionMean
@@ -85,14 +85,5 @@ class BaselineVersion implements VersionResults {
 
     private static boolean differenceIsSignificant(DataSeries<Duration> myTime, DataSeries<Duration> otherTime) {
         confidenceInDifference(myTime, otherTime) > MINIMUM_CONFIDENCE
-    }
-
-    private static double confidenceInDifference(DataSeries first, DataSeries second) {
-        def p = new MannWhitneyUTest().mannWhitneyUTest(asDoubleArray(first), asDoubleArray(second))
-        1 - p
-    }
-
-    private static double[] asDoubleArray(DataSeries series) {
-        series.collect { Amount value -> value.value.doubleValue() } as double[]
     }
 }
