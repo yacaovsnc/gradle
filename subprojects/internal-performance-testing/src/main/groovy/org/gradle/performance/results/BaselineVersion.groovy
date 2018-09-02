@@ -22,6 +22,7 @@ import org.apache.commons.math3.stat.inference.MannWhitneyUTest
 import org.gradle.performance.measure.Amount
 import org.gradle.performance.measure.DataSeries
 import org.gradle.performance.measure.Duration
+import org.gradle.performance.util.Git
 
 import static PrettyCalculator.toMillis
 
@@ -85,9 +86,11 @@ class BaselineVersion implements VersionResults {
             controlGroupStandardError: controlGroup.totalTime.standardError.format(),
             experimentGroupStandardError: experimentGroup.totalTime.standardError.format(),
             regressionPercentage: regressionPercentage,
-            confidence: confidence
+            confidence: confidence,
+            buildId: System.getProperty("org.gradle.performance.build.id"),
+            gitCommitId: Git.current().getCommitId()
         )))
-        sb.append("$MACHINE_DATA_SEPARATOR\n")
+        sb.append("\n$MACHINE_DATA_SEPARATOR\n")
         return sb.toString()
     }
 

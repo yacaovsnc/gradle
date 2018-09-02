@@ -25,6 +25,8 @@ class ScenarioBuildResultData {
     ExperimentData experimentData
 
     static class ExperimentData {
+        String buildId
+        String gitCommitId
         String controlGroupName
         String experimentGroupName
         String controlGroupMedian
@@ -33,6 +35,14 @@ class ScenarioBuildResultData {
         String experimentGroupStandardError
         String confidence
         double regressionPercentage
+    }
+
+    String getGitCommitId() {
+        return experimentData?.gitCommitId
+    }
+
+    String getBuildId() {
+        return experimentData?.buildId
     }
 
     String getControlGroupName() {
@@ -76,12 +86,12 @@ class ScenarioBuildResultData {
         List<Integer> startAndEndIndices = lines.findIndexValues { it.startsWith(BaselineVersion.MACHINE_DATA_SEPARATOR) }
         if (!startAndEndIndices.empty) {
             assert startAndEndIndices.size() == 2 && startAndEndIndices[0] + 2 == startAndEndIndices[1]
-            String json = lines[startAndEndIndices[0] + 1]
+            String json = lines[startAndEndIndices[0].intValue() + 1]
             experimentData = new ObjectMapper().readValue(json, ExperimentData)
         }
     }
 
     String getFormattedRegression() {
-        return experimentData ? String.format("%.2f%", regressionPercentage) : "N/A"
+        return experimentData ? String.format("%.2f%%", regressionPercentage) : "N/A"
     }
 }

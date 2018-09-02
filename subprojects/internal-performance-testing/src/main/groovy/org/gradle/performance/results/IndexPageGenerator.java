@@ -19,6 +19,7 @@ package org.gradle.performance.results;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import org.gradle.performance.util.Git;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,9 +35,11 @@ import static java.util.Comparator.comparingDouble;
 
 public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
     private final Set<ScenarioBuildResultData> scenarios;
+    private final String gitCommitId;
 
     public IndexPageGenerator(File resultJson) {
         this.scenarios = readBuildResultData(resultJson);
+        this.gitCommitId = Git.current().getCommitId();
     }
 
     @VisibleForTesting
@@ -74,7 +77,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
             }
 
             private void renderTable() {
-                table().classAttr("table-striped table");
+                table().classAttr("table table-condensed table-striped");
                     renderHeaders();
                     scenarios.forEach(this::renderScenario);
                 end();
@@ -102,12 +105,17 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
             private void renderScenario(ScenarioBuildResultData scenario) {
                 tr().classAttr(determineScenarioCss(scenario));
                     td();
-                        a().classAttr("label label-" + determineScenarioCss(scenario));
+                        a().href(scenario.getWebUrl()).classAttr("label label-" + determineScenarioCss(scenario));
                             u().text(scenario.getScenarioName()).end();
                         end();
-                        a().classAttr("label label-warning");
+                        a().href("tests/" + urlEncode(scenario.getScenarioName()) + ".html").classAttr("label label-info");
                             u().text("details...").end();
                         end();
+                        if (!gitCommitId.equals(scenario.getGitCommitId()) && scenario.getBuildId() != null) {
+                            a().href("https://builds.gradle.org/viewLog.html?buildId=" + scenario.getBuildId()).classAttr("label label-info");
+                            u().text("original build").end();
+                            end();
+                        }
                     end();
 
                     td();
