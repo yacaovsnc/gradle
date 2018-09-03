@@ -105,44 +105,57 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
             }
 
             private void renderScenario(ScenarioBuildResultData scenario) {
+                if (scenario.getExperimentData().isEmpty()) {
+                    renderScenario(scenario, 0);
+                } else {
+                    for (int i = 0; i < scenario.getExperimentData().size(); i++) {
+                        renderScenario(scenario, i);
+                    }
+                }
+            }
+
+            private void renderScenario(ScenarioBuildResultData scenario, int experimentIndex) {
                 tr().classAttr(determineScenarioCss(scenario));
-                    td();
+
+                if (experimentIndex == 0) {
+                    td().rowspan(scenario.getExperimentData().isEmpty() ? "1" : "" + scenario.getExperimentData().size());
                         a().href(scenario.getWebUrl()).classAttr("label label-" + determineScenarioCss(scenario));
-                            u().text(scenario.getScenarioName()).end();
+                            big().u().text(scenario.getScenarioName()).end().end();
                         end();
-                        a().href("tests/" + urlEncode(scenario.getScenarioName().replace("\\s+", "-")) + ".html").classAttr("label label-info");
-                            u().text("details...").end();
+                        a().href("tests/" + urlEncode(scenario.getScenarioName().replaceAll("\\s+", "-")) + ".html").classAttr("label label-info");
+                            big().u().text("details...").end().end();
                         end();
-                        if (!gitCommitId.equals(scenario.getGitCommitId()) && scenario.getBuildId() != null) {
-                            a().href("https://builds.gradle.org/viewLog.html?buildId=" + scenario.getBuildId()).classAttr("label label-info");
+                    if (!gitCommitId.equals(scenario.getGitCommitId(experimentIndex)) && scenario.getBuildId(experimentIndex) != null) {
+                        a().href("https://builds.gradle.org/viewLog.html?buildId=" + scenario.getBuildId(experimentIndex)).classAttr("label label-info");
                             u().text("original build").end();
-                            end();
-                        }
+                        end();
+                    }
+                    end();
+                }
+
+                    td();
+                        strong().text(scenario.getControlGroupName(experimentIndex)).end();
                     end();
 
                     td();
-                        strong().text(scenario.getControlGroupName()).end();
-                    end();
-
-                    td();
-                        span().classAttr(scenario.getRegressionPercentage() > 0 ? "text-success" : "text-danger").text(scenario.getControlGroupMedian());
-                            small().classAttr("text-muted").text(scenario.getControlGroupStandardError()).end();
+                        span().classAttr(scenario.getRegressionPercentage() > 0 ? "text-success" : "text-danger").text(scenario.getControlGroupMedian(experimentIndex));
+                            small().classAttr("text-muted").text("se: " + scenario.getControlGroupStandardError(experimentIndex)).end();
                         end();
                     end();
 
                     td();
-                        strong().text(scenario.getExperimentGroupName()).end();
+                        strong().text(scenario.getExperimentGroupName(experimentIndex)).end();
                     end();
 
                     td();
-                        span().classAttr(scenario.getRegressionPercentage() <= 0 ? "text-success" : "text-danger").text(scenario.getExperimentGroupMedian());
-                            small().classAttr("text-muted").text(scenario.getExperimentGroupStandardError()).end();
+                        span().classAttr(scenario.getRegressionPercentage() <= 0 ? "text-success" : "text-danger").text(scenario.getExperimentGroupMedian(experimentIndex));
+                            small().classAttr("text-muted").text("se: " + scenario.getExperimentGroupStandardError(experimentIndex)).end();
                         end();
                     end();
 
                     td();
-                        span().classAttr(scenario.getRegressionPercentage() <= 0 ? "text-success": "text-danger").text(scenario.getFormattedRegression());
-                            small().classAttr("text-muted").text("conf: " + scenario.getConfidence()).end();
+                        span().classAttr(scenario.getRegressionPercentage() <= 0 ? "text-success": "text-danger").text(scenario.getFormattedRegression(experimentIndex));
+                            small().classAttr("text-muted").text("conf: " + scenario.getConfidence(experimentIndex)).end();
                         end();
                     end();
                 end();

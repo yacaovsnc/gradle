@@ -63,23 +63,23 @@ public class TestPageGenerator extends HtmlPageGenerator<PerformanceTestHistory>
             h3().text("Test details").end();
             table().classAttr("test-details");
             tr();
-            th().text("Scenario").end();
-            th().text("Test project").end();
-            th().text("Tasks").end();
-            th().text("Clean tasks").end();
-            th().text("Gradle args").end();
-            th().text("Gradle JVM args").end();
-            th().text("Daemon").end();
+                th().text("Scenario").end();
+                th().text("Test project").end();
+                th().text("Tasks").end();
+                th().text("Clean tasks").end();
+                th().text("Gradle args").end();
+                th().text("Gradle JVM args").end();
+                th().text("Daemon").end();
             end();
             for (ScenarioDefinition scenario : testHistory.getScenarios()) {
                 tr();
-                textCell(scenario.getDisplayName());
-                textCell(scenario.getTestProject());
-                textCell(scenario.getTasks());
-                textCell(scenario.getCleanTasks());
-                textCell(scenario.getArgs());
-                textCell(scenario.getGradleOpts());
-                textCell(scenario.getDaemon());
+                    textCell(scenario.getDisplayName());
+                    textCell(scenario.getTestProject());
+                    textCell(scenario.getTasks());
+                    textCell(scenario.getCleanTasks());
+                    textCell(scenario.getArgs());
+                    textCell(scenario.getGradleOpts());
+                    textCell(scenario.getDaemon());
                 end();
             }
             end();

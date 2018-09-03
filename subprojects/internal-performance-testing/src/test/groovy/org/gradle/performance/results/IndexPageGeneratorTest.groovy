@@ -19,7 +19,6 @@ package org.gradle.performance.results
 import groovy.json.JsonOutput
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Subject
 
@@ -45,9 +44,8 @@ ${BaselineVersion.MACHINE_DATA_SEPARATOR}
         """
     }
 
-    @Ignore
     def 'can sort scenarios correctly'() {
-        resultsJson << JsonOutput.toJson([
+        resultsJson.text = JsonOutput.toJson([
             new ScenarioBuildResultData(scenarioName: 'no regression', webUrl: 'no regression url', successful: true),
             new ScenarioBuildResultData(scenarioName: 'small regression', webUrl: 'small regression url', successful: false, result: regressionOutput(1.0)),
             new ScenarioBuildResultData(scenarioName: 'big regression', webUrl: 'big regression url', successful: false, result: regressionOutput(10.0)),

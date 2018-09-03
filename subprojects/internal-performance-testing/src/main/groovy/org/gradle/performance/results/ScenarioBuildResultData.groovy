@@ -24,7 +24,7 @@ class ScenarioBuildResultData {
     String scenarioName
     String webUrl
     boolean successful
-    ExperimentData experimentData
+    List<ExperimentData> experimentData = []
 
     static class ExperimentData {
         String buildId
@@ -39,61 +39,71 @@ class ScenarioBuildResultData {
         double regressionPercentage
     }
 
-    String getGitCommitId() {
-        return experimentData?.gitCommitId
+    String getGitCommitId(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].gitCommitId : "N/A"
     }
 
-    String getBuildId() {
-        return experimentData?.buildId
+    String getBuildId(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].buildId : "N/A"
     }
 
-    String getControlGroupName() {
-        return experimentData?.controlGroupName ?: "N/A"
+    String getControlGroupName(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].controlGroupName : "N/A"
     }
 
-    String getExperimentGroupName() {
-        return experimentData?.experimentGroupName ?: "N/A"
+    String getExperimentGroupName(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].experimentGroupName : "N/A"
     }
 
-    String getControlGroupMedian() {
-        return experimentData?.controlGroupMedian ?: "N/A"
+    String getControlGroupMedian(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].controlGroupMedian : "N/A"
     }
 
-    String getExperimentGroupMedian() {
-        return experimentData?.experimentGroupMedian ?: "N/A"
+    String getExperimentGroupMedian(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].experimentGroupMedian : "N/A"
     }
 
-    String getControlGroupStandardError() {
-        return experimentData?.controlGroupStandardError ?: "N/A"
+    String getControlGroupStandardError(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].controlGroupStandardError : "N/A"
     }
 
-    String getExperimentGroupStandardError() {
-        return experimentData?.experimentGroupStandardError ?: "N/A"
+    String getExperimentGroupStandardError(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].experimentGroupStandardError : "N/A"
     }
 
-    String getConfidence() {
-        return experimentData?.confidence ?: "N/A"
+    String getConfidence(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? experimentData[experimentIndex].confidence : "N/A"
+    }
+
+    String getFormattedRegression(int experimentIndex) {
+        return experimentData.size() > experimentIndex ? String.format("%.2f%%", experimentData[experimentIndex].regressionPercentage) : "N/A"
     }
 
     double getRegressionPercentage() {
-        return experimentData?.regressionPercentage ?: 0.0
+        return experimentData.empty ? 0.0 : experimentData[0].regressionPercentage
     }
 
     boolean isRegressed() {
-        return !successful && experimentData != null
+        return !successful && !experimentData.empty
     }
 
     void setResult(String junitSystemOut) {
+        if(!junitSystemOut) {
+            return
+        }
+
         List<String> lines = junitSystemOut.readLines()
         List<Integer> startAndEndIndices = lines.findIndexValues { it.startsWith(BaselineVersion.MACHINE_DATA_SEPARATOR) }
         if (!startAndEndIndices.empty) {
-//            assert startAndEndIndices.size() == 2 && startAndEndIndices[0] + 2 == startAndEndIndices[1]
-            String json = lines[startAndEndIndices[0].intValue() + 1]
-            experimentData = new ObjectMapper().readValue(json, ExperimentData)
+            assert startAndEndIndices.size() <= 6
+            for (int i = 0; i < startAndEndIndices.size(); i += 2) {
+                int startIndex = startAndEndIndices[i].intValue()
+                int endIndex = startAndEndIndices[i + 1].intValue()
+                assert startIndex + 2 == endIndex
+                String json = lines[startIndex + 1]
+                experimentData.add(new ObjectMapper().readValue(json, ExperimentData))
+            }
         }
     }
 
-    String getFormattedRegression() {
-        return experimentData ? String.format("%.2f%%", regressionPercentage) : "N/A"
-    }
 }
