@@ -17,17 +17,12 @@
 package org.gradle.performance.results
 
 import groovy.json.JsonOutput
-import org.gradle.performance.measure.Amount
-import org.gradle.performance.measure.Duration
-import org.gradle.performance.measure.MeasuredOperation
-import org.gradle.performance.util.Git
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
 import org.junit.Rule
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Subject
 
-@Ignore
 class IndexPageGeneratorTest extends Specification {
     @Rule
     TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
@@ -36,56 +31,30 @@ class IndexPageGeneratorTest extends Specification {
     IndexPageGenerator generator
 
     File resultsJson = tmpDir.file('results.json')
-    ResultsStore mockStore = Mock(ResultsStore)
 
-    def createGenerator(String json) {
-        resultsJson << json
-        generator = new IndexPageGenerator([], resultsJson)
+    def setup() {
+        resultsJson << "[]"
+        generator = new IndexPageGenerator(resultsJson)
     }
 
+    String regressionOutput(double regressionPercentage) {
+        """
+${BaselineVersion.MACHINE_DATA_SEPARATOR}
+${JsonOutput.toJson([regressionPercentage: regressionPercentage])}
+${BaselineVersion.MACHINE_DATA_SEPARATOR}
+        """
+    }
+
+    @Ignore
     def 'can sort scenarios correctly'() {
-        setup:
-        createGenerator(JsonOutput.toJson([
-            new ScenarioBuildResultData(name: 'active1', webUrl: 'activeUrl1', successful: true),
-            new ScenarioBuildResultData(name: 'active2', webUrl: 'activeUrl2', successful: false),
-            new ScenarioBuildResultData(name: 'active3', webUrl: 'activeUrl3', successful: true),
-        ]))
+        resultsJson << JsonOutput.toJson([
+            new ScenarioBuildResultData(scenarioName: 'no regression', webUrl: 'no regression url', successful: true),
+            new ScenarioBuildResultData(scenarioName: 'small regression', webUrl: 'small regression url', successful: false, result: regressionOutput(1.0)),
+            new ScenarioBuildResultData(scenarioName: 'big regression', webUrl: 'big regression url', successful: false, result: regressionOutput(10.0)),
+            new ScenarioBuildResultData(scenarioName: 'build failure', webUrl: 'build failure url', successful: false),
+        ])
 
-        String currentCommit = Git.current().getCommitId()
-
-        PerformanceTestHistory archivedHistory = Mock(PerformanceTestHistory)
-        PerformanceTestHistory smallRegressionHistory = Mock(PerformanceTestHistory)
-        PerformanceTestHistory bigRegressionHistory = Mock(PerformanceTestHistory)
-
-
-        PerformanceTestExecution smallRegressionExecution = Mock(PerformanceTestExecution)
-        PerformanceTestExecution bigRegressionExecution = Mock(PerformanceTestExecution)
-
-        when:
-        _ * mockStore.getTestNames() >> ['active1', 'active2', 'active3', 'archive1', 'archive2']
-        _ * mockStore.getTestResults('active1', _, _, _) >> smallRegressionHistory
-        _ * mockStore.getTestResults('active2', _, _, _) >> smallRegressionHistory
-        _ * mockStore.getTestResults('active3', _, _, _) >> bigRegressionHistory
-        _ * mockStore.getTestResults('archive1', _, _, _) >> archivedHistory
-        _ * mockStore.getTestResults('archive2', _, _, _) >> archivedHistory
-
-        _ * smallRegressionExecution.getScenarios() >> [experiement(1), experiement(1)]
-        _ * bigRegressionExecution.getScenarios() >> [experiement(1), experiement(2)]
-        _ * smallRegressionExecution.getVcsCommits() >> [currentCommit]
-        _ * bigRegressionExecution.getVcsCommits() >> [currentCommit]
-
-        _ * archivedHistory.getExecutions() >> []
-
-        _ * smallRegressionHistory.getExecutions() >> [smallRegressionExecution]
-        _ * bigRegressionHistory.getExecutions() >> [bigRegressionExecution]
-
-        then:
-        generator.sortTestResults(mockStore).toList().collect { it.name } == ['active2', 'active3', 'active1', 'archive1', 'archive2']
-    }
-
-    private MeasuredOperationList experiement(int value) {
-        MeasuredOperationList measuredOperationList = new MeasuredOperationList()
-        measuredOperationList.add(new MeasuredOperation(totalTime: Amount.valueOf(value, Duration.SECONDS)))
-        return measuredOperationList
+        expect:
+        generator.readBuildResultData(resultsJson).toList().collect { it.scenarioName } == ['build failure', 'big regression', 'small regression', 'no regression']
     }
 }

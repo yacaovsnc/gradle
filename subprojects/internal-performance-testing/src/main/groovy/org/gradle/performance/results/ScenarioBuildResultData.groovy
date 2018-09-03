@@ -16,8 +16,10 @@
 
 package org.gradle.performance.results
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 class ScenarioBuildResultData {
     String scenarioName
     String webUrl
@@ -85,7 +87,7 @@ class ScenarioBuildResultData {
         List<String> lines = junitSystemOut.readLines()
         List<Integer> startAndEndIndices = lines.findIndexValues { it.startsWith(BaselineVersion.MACHINE_DATA_SEPARATOR) }
         if (!startAndEndIndices.empty) {
-            assert startAndEndIndices.size() == 2 && startAndEndIndices[0] + 2 == startAndEndIndices[1]
+//            assert startAndEndIndices.size() == 2 && startAndEndIndices[0] + 2 == startAndEndIndices[1]
             String json = lines[startAndEndIndices[0].intValue() + 1]
             experimentData = new ObjectMapper().readValue(json, ExperimentData)
         }

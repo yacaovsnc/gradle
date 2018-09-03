@@ -185,6 +185,11 @@ public class PerformanceTest extends DistributionTest {
         this.buildId = buildId;
     }
 
+    @Internal
+    public String getBuildId() {
+        return buildId;
+    }
+
     private class PerformanceTestJvmArgumentsProvider implements CommandLineArgumentProvider {
         @Override
         public Iterable<String> asArguments() {

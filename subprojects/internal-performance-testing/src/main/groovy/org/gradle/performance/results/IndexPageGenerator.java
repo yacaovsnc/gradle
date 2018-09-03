@@ -46,6 +46,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
     Set<ScenarioBuildResultData> readBuildResultData(File resultJson) {
         try {
             Comparator<ScenarioBuildResultData> comparator = comparing(ScenarioBuildResultData::isSuccessful)
+                .thenComparing(ScenarioBuildResultData::isRegressed)
                 .thenComparing(comparingDouble(ScenarioBuildResultData::getRegressionPercentage).reversed())
                 .thenComparing(ScenarioBuildResultData::getScenarioName);
 

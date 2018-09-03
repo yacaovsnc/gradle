@@ -23,7 +23,6 @@ import org.gradle.util.SetSystemProperties
 import org.junit.Rule
 import spock.lang.Ignore
 
-@Ignore
 class ReportGeneratorTest extends ResultSpecification {
     @Rule TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
     @Rule SetSystemProperties properties = new SetSystemProperties("org.gradle.performance.db.url": "jdbc:h2:" + tmpDir.testDirectory)
@@ -54,6 +53,7 @@ class ReportGeneratorTest extends ResultSpecification {
         store.close()
     }
 
+    @Ignore
     def "does not show tests without results for most recent commit in summary"() {
         given:
         long now = Calendar.getInstance().time.time
