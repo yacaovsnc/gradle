@@ -53,6 +53,8 @@ public class PerformanceTest extends DistributionTest {
     private String resultStoreClass = "org.gradle.performance.results.AllResultsStore";
     private boolean flamegraphs;
 
+    private String buildId;
+
     private final Map<String, String> databaseParameters = new HashMap<>();
 
     private File debugArtifactsDirectory = new File(getProject().getBuildDir(), getName());
@@ -179,6 +181,10 @@ public class PerformanceTest extends DistributionTest {
         this.databaseParameters.putAll(databaseConnectionParameters);
     }
 
+    public void setBuildId(String buildId) {
+        this.buildId = buildId;
+    }
+
     private class PerformanceTestJvmArgumentsProvider implements CommandLineArgumentProvider {
         @Override
         public Iterable<String> asArguments() {
@@ -195,6 +201,7 @@ public class PerformanceTest extends DistributionTest {
             addSystemPropertyIfExist(result, "org.gradle.performance.execution.runs", runs);
             addSystemPropertyIfExist(result, "org.gradle.performance.execution.checks", checks);
             addSystemPropertyIfExist(result, "org.gradle.performance.execution.channel", channel);
+            addSystemPropertyIfExist(result, "org.gradle.performance.build.id", buildId);
 
             if (flamegraphs) {
                 File artifactsDirectory = new File(getDebugArtifactsDirectory(), "flames");

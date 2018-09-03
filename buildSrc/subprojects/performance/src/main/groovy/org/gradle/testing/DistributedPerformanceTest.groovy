@@ -55,10 +55,6 @@ import groovy.json.JsonOutput
 @CompileStatic
 @CacheableTask
 class DistributedPerformanceTest extends PerformanceTest {
-
-    @Internal
-    String coordinatorBuildId
-
     @Internal
     String branchName
 
@@ -226,7 +222,7 @@ class DistributedPerformanceTest extends PerformanceTest {
                     ${renderLastChange(lastChangeId)}
                 </build>
             """
-        logger.info("Scheduling $scenario.id, estimated runtime: $scenario.estimatedRuntime, coordinatorBuildId: $coordinatorBuildId, lastChangeId: $lastChangeId, build request: $buildRequest")
+        logger.info("Scheduling $scenario.id, estimated runtime: $scenario.estimatedRuntime, coordinatorBuildId: $buildId, lastChangeId: $lastChangeId, build request: $buildRequest")
         def response = client.post(
             path: "buildQueue",
             requestContentType: ContentType.XML,
@@ -238,7 +234,7 @@ class DistributedPerformanceTest extends PerformanceTest {
         }
         def scheduledChangeId = findLastChangeIdInXml(response.data)
         if (lastChangeId && scheduledChangeId != lastChangeId) {
-            throw new RuntimeException("The requested change id is different than the actual one. requested change id: $lastChangeId in coordinatorBuildId: $coordinatorBuildId , actual change id: $scheduledChangeId in workerBuildId: $workerBuildId\nresponse: ${xmlToString(response.data)}")
+            throw new RuntimeException("The requested change id is different than the actual one. requested change id: $lastChangeId in coordinatorBuildId: $buildId, actual change id: $scheduledChangeId in workerBuildId: $workerBuildId\nresponse: ${xmlToString(response.data)}")
         }
         scheduledBuildIds += workerBuildId
     }
@@ -269,10 +265,10 @@ class DistributedPerformanceTest extends PerformanceTest {
 
     @TypeChecked(TypeCheckingMode.SKIP)
     private CoordinatorBuild resolveCoordinatorBuild() {
-        if (coordinatorBuildId) {
-            def response = client.get(path: "builds/id:$coordinatorBuildId")
+        if (buildId) {
+            def response = client.get(path: "builds/id:$buildId")
             if (response.success) {
-                return new CoordinatorBuild(id: coordinatorBuildId, lastChangeId: findLastChangeIdInXml(response.data), buildTypeId: response.data.@buildTypeId.text())
+                return new CoordinatorBuild(id: buildId, lastChangeId: findLastChangeIdInXml(response.data), buildTypeId: response.data.@buildTypeId.text())
             }
         }
         return null
@@ -342,7 +338,7 @@ class DistributedPerformanceTest extends PerformanceTest {
     }
 
     void cancel(String buildId, String endpoint) {
-        String link = XmlUtil.escapeXml("$teamCityUrl/viewLog.html?buildId=$coordinatorBuildId&buildTypeId=$buildTypeId")
+        String link = XmlUtil.escapeXml("$teamCityUrl/viewLog.html?buildId=$buildId&buildTypeId=$buildTypeId")
         String cancelRequest = """<buildCancelRequest comment="Coordinator build was canceled: $link" readdIntoQueue="false" />"""
         client.post(
             path: "$endpoint/id:$buildId",

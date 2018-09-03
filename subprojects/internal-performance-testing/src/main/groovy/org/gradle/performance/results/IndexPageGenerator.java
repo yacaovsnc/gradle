@@ -65,6 +65,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
                 html();
                     head();
                         headSection(this);
+                        link().rel("stylesheet").type("text/css").href("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css").end();
                         title().text("Profile report for channel " + ResultsStoreHelper.determineChannel()).end();
                     end();
                     body();
@@ -108,7 +109,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
                         a().href(scenario.getWebUrl()).classAttr("label label-" + determineScenarioCss(scenario));
                             u().text(scenario.getScenarioName()).end();
                         end();
-                        a().href("tests/" + urlEncode(scenario.getScenarioName()) + ".html").classAttr("label label-info");
+                        a().href("tests/" + urlEncode(scenario.getScenarioName().replace("\\s+", "-")) + ".html").classAttr("label label-info");
                             u().text("details...").end();
                         end();
                         if (!gitCommitId.equals(scenario.getGitCommitId()) && scenario.getBuildId() != null) {
@@ -139,7 +140,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
                     end();
 
                     td();
-                        span().classAttr(scenario.getRegressionPercentage() > 0 ? "text-success": "text-danger").text(scenario.getFormattedRegression());
+                        span().classAttr(scenario.getRegressionPercentage() <= 0 ? "text-success": "text-danger").text(scenario.getFormattedRegression());
                             small().classAttr("text-muted").text("conf: " + scenario.getConfidence()).end();
                         end();
                     end();

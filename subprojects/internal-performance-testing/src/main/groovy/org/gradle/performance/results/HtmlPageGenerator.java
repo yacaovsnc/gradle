@@ -51,11 +51,6 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
             .type("text/css")
             .href(rootDir + "css/style.css")
             .end();
-        html.link()
-            .rel("stylesheet")
-            .type("text/css")
-            .href("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css")
-            .end();
         html.script()
             .src(rootDir + "js/jquery.min-1.11.0.js")
             .end();
