@@ -392,7 +392,7 @@ class DistributedPerformanceTest extends PerformanceTest {
     private void checkForErrors() {
         def failedBuilds = finishedBuilds.values().findAll { it.@status != "SUCCESS" }
         if (failedBuilds) {
-            throw new GradleException("${failedBuilds.size()} performance tests failed. See $scenarioReport for details.")
+            throw new GradleException("${failedBuilds.size()} performance tests failed. See $reportDir for details.")
         }
     }
 

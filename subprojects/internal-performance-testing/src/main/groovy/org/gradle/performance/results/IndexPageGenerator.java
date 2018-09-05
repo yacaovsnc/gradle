@@ -79,7 +79,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
             }
 
             private void renderTable() {
-                table().classAttr("table table-condensed table-striped");
+                table().classAttr("table table-condensed table-striped table-bordered");
                     renderHeaders();
                     scenarios.forEach(this::renderScenario);
                 end();
@@ -125,9 +125,9 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
                         a().href("tests/" + urlEncode(scenario.getScenarioName().replaceAll("\\s+", "-")) + ".html").classAttr("label label-info");
                             big().u().text("details...").end().end();
                         end();
-                    if (!gitCommitId.equals(scenario.getGitCommitId(experimentIndex)) && scenario.getBuildId(experimentIndex) != null) {
+                    if (!gitCommitId.equals(scenario.getGitCommitId(experimentIndex)) && !"N/A".equals(scenario.getBuildId(experimentIndex))) {
                         a().href("https://builds.gradle.org/viewLog.html?buildId=" + scenario.getBuildId(experimentIndex)).classAttr("label label-info");
-                            u().text("original build").end();
+                            big().u().text("original build").end().end();
                         end();
                     }
                     end();
@@ -165,13 +165,13 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
             private void renderSummary() {
                 long successCount = scenarios.stream().filter(ScenarioBuildResultData::isSuccessful).count();
                 long regressedCount = scenarios.stream().filter(ScenarioBuildResultData::isRegressed).count();
-                long otherCount = scenarios.size() - successCount;
+                long failureCount = scenarios.size() - successCount - regressedCount;
                 h3().text("" + successCount + " successful scenarios");
                 if (regressedCount > 0) {
                     text(", " + regressedCount + " regressed scenarios");
                 }
-                if (otherCount > 0) {
-                    text(", " + otherCount + " failed scenarios");
+                if (failureCount > 0) {
+                    text(", " + failureCount + " failed scenarios");
                 }
                 end();
             }
