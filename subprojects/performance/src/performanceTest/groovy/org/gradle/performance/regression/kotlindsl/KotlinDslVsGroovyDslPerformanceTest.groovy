@@ -63,7 +63,7 @@ class KotlinDslVsGroovyDslPerformanceTest extends AbstractCrossBuildPerformanceT
             invocationCount measuredBuilds
             invocation {
                 gradleOptions = ["-Xms${kotlinProject.daemonMemory}", "-Xmx${kotlinProject.daemonMemory}"]
-                tasksToRun("help", "unexistTask")
+                tasksToRun("help")
                 useDaemon()
             }
         }
