@@ -165,9 +165,9 @@ class DefaultProjectTest {
     BuildOperationExecutor buildOperationExecutor = new TestBuildOperationExecutor()
     ListenerBuildOperationDecorator listenerBuildOperationDecorator = new TestListenerBuildOperationDecorator()
     CrossProjectConfigurator crossProjectConfigurator = new BuildOperationCrossProjectConfigurator(buildOperationExecutor)
-
     ClassLoaderScope baseClassLoaderScope = new RootClassLoaderScope(getClass().classLoader, getClass().classLoader, new DummyClassLoaderCache())
     ClassLoaderScope rootProjectClassLoaderScope = baseClassLoaderScope.createChild("root-project")
+    ProjectStateRegistry projectStateRegistryMock = context.mock(ProjectStateRegistry)
 
     @Before
     void setUp() {
@@ -240,6 +240,9 @@ class DefaultProjectTest {
             ignoring(modelRegistry)
             allowing(serviceRegistryMock).get((Type) ModelRegistry); will(returnValue(modelRegistry))
             allowing(serviceRegistryMock).get(ModelRegistry); will(returnValue(modelRegistry))
+
+            allowing(serviceRegistryMock).get((Type) ProjectStateRegistry) ; will(returnValue(projectStateRegistryMock))
+            allowing(serviceRegistryMock).get(ProjectStateRegistry) ; will(returnValue(projectStateRegistryMock))
 
             ModelSchemaStore modelSchemaStore = context.mock(ModelSchemaStore)
             ignoring(modelSchemaStore)
@@ -736,6 +739,7 @@ def scriptMethod(Closure closure) {
             ignoring(fileOperationsMock)
             ignoring(propertyStateFactoryMock)
             ignoring(taskContainerMock)
+            ignoring(projectStateRegistryMock)
             allowing(serviceRegistryMock).get(ServiceRegistryFactory); will(returnValue({} as ServiceRegistryFactory))
         }
         project.ext.additional = 'additional'
