@@ -47,7 +47,6 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
     private final CollectionEventRegister<T> eventRegister;
     private final ElementSource<T> store;
     private ImmutableActionSet<Void> mutateAction = ImmutableActionSet.empty();
-    private final MutationGuard mutationGuard = new DefaultMutationGuard();
 
     protected DefaultDomainObjectCollection(Class<? extends T> type, ElementSource<T> store) {
         this(type, store, new BroadcastingCollectionEventRegister<T>(type));
@@ -394,7 +393,7 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
 
     @Override
     public MutationGuard getMutationGuard() {
-        return mutationGuard;
+        return MutationGuards.of(store);
     }
 
     public Collection<T> findAll(Closure cl) {
@@ -412,7 +411,7 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
     }
 
     protected void assertMutable(String methodName) {
-        mutationGuard.assertMutationAllowed(methodName, this);
+        getMutationGuard().assertMutationAllowed(methodName, this);
         mutateAction.execute(null);
     }
 
