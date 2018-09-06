@@ -34,6 +34,7 @@ plugins {
     id("com.gradle.build-scan")
 }
 
+
 defaultTasks("assemble")
 
 base.archivesBaseName = "gradle"
