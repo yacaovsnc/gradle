@@ -159,7 +159,7 @@ public class BasePlugin implements Plugin<Project> {
         ConfigurationContainer configurations = project.getConfigurations();
         project.setStatus("integration");
 
-        Configuration archivesConfiguration = configurations.maybeCreate(Dependency.ARCHIVES_CONFIGURATION).
+        final Configuration archivesConfiguration = configurations.maybeCreate(Dependency.ARCHIVES_CONFIGURATION).
                 setDescription("Configuration for archive artifacts.");
 
         configurations.maybeCreate(Dependency.DEFAULT_CONFIGURATION).
@@ -171,11 +171,13 @@ public class BasePlugin implements Plugin<Project> {
 
         configurations.all(new Action<Configuration>() {
             public void execute(Configuration configuration) {
-                configuration.getArtifacts().configureEach(new Action<PublishArtifact>() {
-                    public void execute(PublishArtifact artifact) {
-                        defaultArtifacts.addCandidate(artifact);
-                    }
-                });
+                if (!configuration.equals(archivesConfiguration)) {
+                    configuration.getArtifacts().configureEach(new Action<PublishArtifact>() {
+                        public void execute(PublishArtifact artifact) {
+                            defaultArtifacts.addCandidate(artifact);
+                        }
+                    });
+                }
             }
         });
     }
