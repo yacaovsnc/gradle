@@ -17,17 +17,20 @@
 
 package org.gradle.integtests.composite
 
-import org.gradle.integtests.fixtures.AbstractSampleIntegrationTest
+import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.Sample
 import org.gradle.integtests.fixtures.UsesSample
 import org.junit.Rule
 
-class SamplesCompositeBuildIntegrationTest extends AbstractSampleIntegrationTest {
+class SamplesCompositeBuildIntegrationTest extends AbstractIntegrationSpec {
 
     @Rule public final Sample sample = new Sample(temporaryFolder)
 
     @UsesSample('compositeBuilds/basic')
     def "can run app with command-line composite"() {
+        given:
+        executer.withRepositoryMirrors()
+
         when:
         executer.inDirectory(sample.dir.file("my-app")).withArguments("--include-build", "../my-utils")
         succeeds(':run')
@@ -39,6 +42,9 @@ class SamplesCompositeBuildIntegrationTest extends AbstractSampleIntegrationTest
 
     @UsesSample('compositeBuilds/basic')
     def "can run app when modified to be a composite"() {
+        given:
+        executer.withRepositoryMirrors()
+
         when:
         executer.inDirectory(sample.dir.file("my-app")).withArguments("--settings-file", "settings-composite.gradle")
         succeeds(':run')
@@ -50,6 +56,9 @@ class SamplesCompositeBuildIntegrationTest extends AbstractSampleIntegrationTest
 
     @UsesSample('compositeBuilds/basic')
     def "can run app when included in a composite"() {
+        given:
+        executer.withRepositoryMirrors()
+
         when:
         executer.inDirectory(sample.dir.file("composite"))
         succeeds(':run')
@@ -61,6 +70,9 @@ class SamplesCompositeBuildIntegrationTest extends AbstractSampleIntegrationTest
 
     @UsesSample('compositeBuilds/hierarchical-multirepo')
     def "can run app in hierarchical composite"() {
+        given:
+        executer.withRepositoryMirrors()
+
         when:
         executer.inDirectory(sample.dir.file("multirepo-app"))
         succeeds(':run')
@@ -72,6 +84,9 @@ class SamplesCompositeBuildIntegrationTest extends AbstractSampleIntegrationTest
 
     @UsesSample('compositeBuilds/hierarchical-multirepo')
     def "can publish locally and remove submodule from hierarchical composite"() {
+        given:
+        executer.withRepositoryMirrors()
+
         when:
         executer.inDirectory(sample.dir.file("multirepo-app"))
         succeeds(':publishDeps')

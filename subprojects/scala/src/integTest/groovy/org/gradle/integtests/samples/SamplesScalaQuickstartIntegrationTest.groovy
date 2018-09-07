@@ -37,7 +37,7 @@ class SamplesScalaQuickstartIntegrationTest extends AbstractIntegrationTest {
 
     @Before
     void setUp() {
-        useRepositoryMirrors()
+        executer.withRepositoryMirrors()
         projectDir = sample.dir
     }
 

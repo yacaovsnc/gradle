@@ -30,7 +30,7 @@ class SamplesGroovyCustomizedLayoutIntegrationTest extends AbstractIntegrationTe
 
     @Before
     void setup() {
-        useRepositoryMirrors()
+        executer.withRepositoryMirrors()
     }
 
     @Test

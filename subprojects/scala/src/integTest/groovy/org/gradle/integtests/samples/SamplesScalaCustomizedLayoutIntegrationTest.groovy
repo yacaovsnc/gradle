@@ -32,7 +32,7 @@ class SamplesScalaCustomizedLayoutIntegrationTest extends AbstractIntegrationTes
 
     @Before
     void setup() {
-        useRepositoryMirrors()
+        executer.withRepositoryMirrors()
     }
 
     @Test

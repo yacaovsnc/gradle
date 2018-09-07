@@ -26,7 +26,7 @@ class SamplesScalaZincIntegrationTest extends AbstractIntegrationSpec {
     @Rule Sample sample = new Sample(temporaryFolder, 'scala/zinc')
 
     def setup() {
-        useRepositoryMirrors()
+        executer.withRepositoryMirrors()
     }
 
     def canBuildJar() {

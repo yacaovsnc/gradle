@@ -30,7 +30,7 @@ class SamplesGroovyQuickstartIntegrationTest extends AbstractIntegrationTest {
 
     @Before
     void setup() {
-        useRepositoryMirrors()
+        executer.withRepositoryMirrors()
     }
 
     @Test
