@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
     api project(':baseServices')
+    api project(":coreApi")
     api libraries.groovy.coordinates
 
     implementation project(':baseServicesGroovy')
