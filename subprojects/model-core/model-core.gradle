@@ -51,6 +51,7 @@ gradlebuildJava {
 
 testFixtures {
     from(':core')
+    from(':coreApi')
     from(':diagnostics', 'testFixtures')
 }
 
