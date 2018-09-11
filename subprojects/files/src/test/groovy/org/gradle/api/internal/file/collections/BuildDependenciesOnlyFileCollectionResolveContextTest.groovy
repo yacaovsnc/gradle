@@ -178,7 +178,7 @@ class BuildDependenciesOnlyFileCollectionResolveContextTest extends Specificatio
         then:
         1 * provider.maybeVisitBuildDependencies(taskContext) >> false
         1 * provider.get() >> task
-        1 * taskContext.add(task)
+        1 * taskContext.maybeAdd(task)
         0 * taskContext._
         0 * provider._
     }
