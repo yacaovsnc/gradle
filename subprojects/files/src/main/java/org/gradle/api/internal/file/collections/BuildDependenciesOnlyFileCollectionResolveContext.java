@@ -62,7 +62,7 @@ public class BuildDependenciesOnlyFileCollectionResolveContext implements FileCo
         } else if (element instanceof ProviderInternal) {
             ProviderInternal<?> provider = (ProviderInternal<?>) element;
             if (!provider.maybeVisitBuildDependencies(taskContext)) {
-                taskContext.add(((ProviderInternal<?>) element).get());
+                taskContext.maybeAdd(((ProviderInternal<?>) element).get());
             }
         } else if (element instanceof Closure) {
             Closure closure = (Closure) element;
