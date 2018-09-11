@@ -169,6 +169,10 @@ public class CppModelBuilder implements ToolingModelBuilder {
         }
 
         @Override
+        public void maybeAdd(Object dependency) {
+        }
+
+        @Override
         public Task getTask() {
             return null;
         }

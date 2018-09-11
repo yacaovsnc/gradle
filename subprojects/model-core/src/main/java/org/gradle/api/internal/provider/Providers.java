@@ -77,7 +77,7 @@ public class Providers {
         return Cast.uncheckedCast(NULL_PROVIDER);
     }
 
-    public static <T> ProviderInternal<T> of(final T value) {
+    public static <T> ProviderInternal<T> of(T value) {
         return new FixedValueProvider<T>(value);
     }
 
@@ -120,7 +120,8 @@ public class Providers {
 
         @Override
         public boolean maybeVisitBuildDependencies(TaskDependencyResolveContext context) {
-            return false;
+            context.maybeAdd(value);
+            return true;
         }
 
         @Override
