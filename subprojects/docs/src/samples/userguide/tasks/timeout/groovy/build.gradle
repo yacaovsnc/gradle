@@ -1,0 +1,6 @@
+task hangingTask() {
+    doLast {
+        Thread.sleep(1000000)
+    }
+    timeout = Duration.ofMillis(500)
+}
