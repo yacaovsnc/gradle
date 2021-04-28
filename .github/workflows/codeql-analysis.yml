@@ -6,7 +6,7 @@ on:
 jobs:
   CodeQL-Build:
 
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     strategy:
       fail-fast: false
